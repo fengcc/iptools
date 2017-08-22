@@ -1,27 +1,39 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/wangtuanjie/ip17mon"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
+
 	"github.com/atotto/clipboard"
-	"time"
 )
 
 const (
-	SSH_CONFIG = ".ssh/config"
-	MY_IP_URL  = "http://64.182.208.181" // Google 的 icanhazip.com ip
+	SSH_CONFIG  = ".ssh/config"
+	MY_IP_URL   = "http://64.182.208.181"                          // Google 的 icanhazip.com ip
+	IP_FIND_URL = "http://ip.taobao.com/service/getIpInfo.php?ip=" // 淘宝IP地址查询
 )
 
 var (
-	ipreg      = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
-	ipDataFile = flag.String("ipip", "/Users/feng/Projects/go/src/tools/ip/mydata4vipweek2.dat", "location of mydata4vipweek2.dat")
+	ipreg = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
 )
+
+type TaobaoData struct {
+	Country string `json:"country"`
+	Area    string `json:"area"`
+	Region  string `json:"region"`
+	City    string `json:"city"`
+	Isp     string `json:"isp"`
+}
+type TaobaoResp struct {
+	Code int             `json:"code"`
+	Data json.RawMessage `json:"data"`
+}
 
 func getMySelfIp() {
 	resp, err := http.Get(MY_IP_URL)
@@ -29,12 +41,13 @@ func getMySelfIp() {
 		fmt.Printf("Send to %s error: %s\n", MY_IP_URL, err.Error())
 		return
 	}
-	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Read response of %s error: %s\n", MY_IP_URL, err.Error())
+		fmt.Printf("Read response %s error: %s\n", data, err.Error())
 		return
 	}
+	resp.Body.Close()
+
 	ip := strings.TrimRight(string(data[:]), "\n")
 	fmt.Println(ip)
 	getLocation(ip)
@@ -66,32 +79,36 @@ func getIpFromSshConfig(host string) {
 }
 
 func getLocation(ip string) {
-	loc, err := ip17mon.Find(ip)
+	resp, err := http.Get(IP_FIND_URL + ip)
 	if err != nil {
-		fmt.Printf("ip17mon Find error: %s\n", err.Error())
+		fmt.Printf("Send to %s error: %s\n", IP_FIND_URL, err.Error())
 		return
 	}
-	fmt.Println(loc.Country, loc.City, loc.Region, loc.Isp)
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Read response %s error: %s\n", data, err.Error())
+		return
+	}
+	var taobaoResp TaobaoResp
+	if err = json.Unmarshal(data, &taobaoResp); err != nil {
+		fmt.Printf("Json unmarshal %s error: %s\n", data, err.Error())
+		return
+	}
+	if taobaoResp.Code == 1 {
+		fmt.Printf("Find ip location failed: %s\n", taobaoResp.Data)
+		return
+	}
+	var taobaoData TaobaoData
+	if err = json.Unmarshal(taobaoResp.Data, &taobaoData); err != nil {
+		fmt.Printf("Json unmarshal %s error: %s\n", taobaoResp.Data, err.Error())
+		return
+	}
+
+	fmt.Println(taobaoData.Country, taobaoData.Area, taobaoData.Region, taobaoData.City, taobaoData.Isp)
 }
 
 func main() {
 	flag.Parse()
-
-	fileInfo, err := os.Stat(*ipDataFile)
-	if err != nil {
-		fmt.Printf("Get info of %s error: %s\n", *ipDataFile, err.Error())
-		return
-	}
-
-	// IP 库一个月没有更新了，提示更新
-	if time.Now().Sub(fileInfo.ModTime()).Hours() > 24 * 15 {
-		fmt.Println("warning: ip library updated before one month ago")
-	}
-
-	if err := ip17mon.Init(*ipDataFile); err != nil {
-		fmt.Printf("Init ip17mon file %s error: %s\n", *ipDataFile, err.Error())
-		return
-	}
 
 	switch len(os.Args) {
 	case 1:
