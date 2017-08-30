@@ -38,12 +38,12 @@ type TaobaoResp struct {
 func getMySelfIp() {
 	resp, err := http.Get(MY_IP_URL)
 	if err != nil {
-		fmt.Printf("Send to %s error: %s\n", MY_IP_URL, err.Error())
+		fmt.Printf("Send to %s error: %v\n", MY_IP_URL, err)
 		return
 	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Read response %s error: %s\n", data, err.Error())
+		fmt.Printf("Read response %s error: %v\n", data, err)
 		return
 	}
 	resp.Body.Close()
@@ -57,7 +57,7 @@ func getIpFromSshConfig(host string) {
 	homeDir := os.Getenv("HOME")
 	data, err := ioutil.ReadFile(homeDir + "/" + SSH_CONFIG)
 	if err != nil {
-		fmt.Printf("Read file %s error: %s\n", SSH_CONFIG, err.Error())
+		fmt.Printf("Read file %s error: %v\n", SSH_CONFIG, err)
 		return
 	}
 	lines := strings.Split(string(data[:]), "\n")
@@ -81,17 +81,17 @@ func getIpFromSshConfig(host string) {
 func getLocation(ip string) {
 	resp, err := http.Get(IP_FIND_URL + ip)
 	if err != nil {
-		fmt.Printf("Send to %s error: %s\n", IP_FIND_URL, err.Error())
+		fmt.Printf("Send to %s error: %v\n", IP_FIND_URL, err)
 		return
 	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Read response %s error: %s\n", data, err.Error())
+		fmt.Printf("Read response %s error: %v\n", data, err)
 		return
 	}
 	var taobaoResp TaobaoResp
 	if err = json.Unmarshal(data, &taobaoResp); err != nil {
-		fmt.Printf("Json unmarshal %s error: %s\n", data, err.Error())
+		fmt.Printf("Json unmarshal %s error: %v\n", data, err)
 		return
 	}
 	if taobaoResp.Code == 1 {
@@ -100,7 +100,7 @@ func getLocation(ip string) {
 	}
 	var taobaoData TaobaoData
 	if err = json.Unmarshal(taobaoResp.Data, &taobaoData); err != nil {
-		fmt.Printf("Json unmarshal %s error: %s\n", taobaoResp.Data, err.Error())
+		fmt.Printf("Json unmarshal %s error: %v\n", taobaoResp.Data, err)
 		return
 	}
 
